@@ -1,9 +1,9 @@
 # Cloud Run deployment
 
-`cloudbuild.yaml` deploys `rng` from the `main` branch after the Dockerfile's
-typecheck, tests, and TypeScript build succeed. The first successful deployment
-creates the Cloud Run service. No build or deployment is started by adding these
-files to the repository.
+`cloudbuild.yaml` deploys `rng` after the Dockerfile's typecheck, tests, and
+TypeScript build succeed. It can be submitted from a local checkout for the
+first deployment, then run from a `main` branch trigger later. No build or
+deployment is started by adding these files to the repository.
 
 ## Choose the region
 
@@ -24,7 +24,6 @@ BUILD_SA="rng-build@${PROJECT_ID}.iam.gserviceaccount.com"
 ## One-time project setup
 
 1. Enable Cloud Build, Cloud Run, Artifact Registry, Secret Manager, and IAM.
-   Secret Manager is currently disabled in `godpack-app`.
 
    ```sh
    gcloud services enable cloudbuild.googleapis.com run.googleapis.com \
@@ -32,34 +31,39 @@ BUILD_SA="rng-build@${PROJECT_ID}.iam.gserviceaccount.com"
      --project="$PROJECT_ID"
    ```
 
-2. Create a Docker repository in the chosen region and two service accounts.
-   The build account builds and deploys; the runtime account accesses Firestore
-   and the API key.
+2. Create a Docker repository, a dedicated `rng-chain` Firestore database, and two
+   service accounts. The build account builds and deploys; the runtime account
+   accesses only the RNG database and API key.
 
    ```sh
    gcloud artifacts repositories create rng --repository-format=docker \
      --location="$REGION" --project="$PROJECT_ID"
+   gcloud firestore databases create --database=rng-chain --location="$REGION" \
+     --type=firestore-native --project="$PROJECT_ID"
    gcloud iam service-accounts create rng-runtime --project="$PROJECT_ID"
    gcloud iam service-accounts create rng-build --project="$PROJECT_ID"
    ```
 
-3. Grant the runtime account Firestore read/write access. In the Secret Manager
-   console, create `rng-api-key` with a strong random value as version `1`.
+3. Grant the runtime account Firestore read/write access only to the `rng-chain`
+   database. In the Secret Manager console, create `rng-api-key` with a strong
+   random value as version `1`.
    Store the same key securely for the service that calls
    `POST /v1/draw-batches`. Never put it in source control or Cloud Build
    substitutions. Then grant the runtime account access to that secret.
 
    ```sh
    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-     --member="serviceAccount:$RUNTIME_SA" --role=roles/datastore.user
+     --member="serviceAccount:$RUNTIME_SA" --role=roles/datastore.user \
+     --condition='expression=resource.name=="projects/godpack-app/databases/rng-chain",title=RngDatabaseOnly,description=RNG database access'
    gcloud secrets add-iam-policy-binding rng-api-key --project="$PROJECT_ID" \
      --member="serviceAccount:$RUNTIME_SA" \
      --role=roles/secretmanager.secretAccessor
    ```
 
 4. Give the build account Artifact Registry Writer on the `rng` repository,
-   Cloud Run Admin and Logs Writer in the project, and Service Account User on
-   `rng-runtime`. Cloud Build logs use Cloud Logging.
+   Logs Writer in the project, and Service Account User on `rng-runtime`.
+   Cloud Build logs use Cloud Logging. Grant Cloud Run Developer on the `rng`
+   service after the first deployment creates it.
 
    ```sh
    gcloud artifacts repositories add-iam-policy-binding rng \
@@ -67,9 +71,8 @@ BUILD_SA="rng-build@${PROJECT_ID}.iam.gserviceaccount.com"
      --member="serviceAccount:$BUILD_SA" \
      --role=roles/artifactregistry.writer
    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-     --member="serviceAccount:$BUILD_SA" --role=roles/run.admin
-   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-     --member="serviceAccount:$BUILD_SA" --role=roles/logging.logWriter
+     --member="serviceAccount:$BUILD_SA" --role=roles/logging.logWriter \
+     --condition=None
    gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
      --project="$PROJECT_ID" --member="serviceAccount:$BUILD_SA" \
      --role=roles/iam.serviceAccountUser
@@ -77,6 +80,29 @@ BUILD_SA="rng-build@${PROJECT_ID}.iam.gserviceaccount.com"
 
    If the GitHub connection stages source in a Cloud Storage bucket, also give
    `rng-build` read access to that bucket.
+
+## First deployment from a local checkout
+
+After committing the deployment files locally, submit the checkout to Cloud
+Build. This project currently uses the Compute Engine default build account,
+which already has the permissions needed for the initial Cloud Run creation.
+The checkout is uploaded to Cloud Build, not pushed to GitHub. The image is
+tagged with the local commit SHA. Run this only when ready to create a public
+Cloud Run service and send traffic to it.
+
+```sh
+gcloud builds submit . --config=cloudbuild.yaml --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --substitutions="COMMIT_SHA=$(git rev-parse HEAD),_REGION=$REGION,_RNG_SECRET_VERSION=1"
+```
+
+After a successful deployment, scope future build deployments to this service:
+
+```sh
+gcloud run services add-iam-policy-binding rng --region="$REGION" \
+  --project="$PROJECT_ID" --member="serviceAccount:$BUILD_SA" \
+  --role=roles/run.developer
+```
 
 ## Connect GitHub and create the trigger
 
@@ -103,7 +129,7 @@ typecheck, test, or build stops the pipeline before the push. Cloud Run receives
 service-account key file is needed. Cloud Run public access is enabled for the
 verification endpoints; the draw-batch route still requires the bearer key.
 
-If using a named Firestore database, set `FIRESTORE_DATABASE_ID` on the Cloud
-Run service before sending traffic. For the existing default database, leave
-it unset. After the first deployment, check `/health`, `/v1/head`, and the
-Cloud Build logs. Independent checkpoint publishing remains unconfigured.
+The deployment sets `FIRESTORE_DATABASE_ID=rng-chain`; it does not write to the
+existing default Firestore database. After the first deployment, check
+`/health`, `/v1/head`, and the Cloud Build logs. Independent checkpoint
+publishing remains unconfigured.

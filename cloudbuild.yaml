@@ -26,6 +26,7 @@ steps:
       - --region=${_REGION}
       - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/rng/rng:${COMMIT_SHA}
       - --service-account=rng-runtime@${PROJECT_ID}.iam.gserviceaccount.com
+      - --update-env-vars=FIRESTORE_DATABASE_ID=rng-chain
       - --update-secrets=RNG_API_KEY=rng-api-key:${_RNG_SECRET_VERSION}
       - --no-invoker-iam-check
       - --quiet
