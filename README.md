@@ -1,3 +1,3 @@
 # rng
 
-Initial repository setup for the rng project.
+A project for verifiable random number generation.
