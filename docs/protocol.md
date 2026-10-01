@@ -1,6 +1,7 @@
 # RNG chain protocol v1
 
 This document defines the public chain format. The README stays focused on the project itself.
+For endpoint inputs, outputs, and error codes, see [api.md](api.md).
 
 ## Draws
 
