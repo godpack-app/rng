@@ -5,8 +5,10 @@ long random `RNG_API_KEY`. The app uses Firebase Application Default Credentials
 set `FIRESTORE_DATABASE_ID` only when using a named Firestore database. For a
 local Firestore emulator, set `FIRESTORE_EMULATOR_HOST` in the environment.
 
-`npm run dev` starts the local watcher. `npm run check`, `npm test`, and
-`npm run build` validate without starting a server.
+`npm run dev` starts the local watcher. `npm run check`, `npm test`,
+`npm run test:coverage`, and `npm run build` validate the application. The
+coverage command includes every `src/**/*.ts` file and requires 100% branch
+coverage; Cloud Build runs it before building the runtime image.
 
 The write API accepts `POST /v1/draw-batches` with a JSON body such as
 `{"count": 2}`, an `Authorization: Bearer <RNG_API_KEY>` header, and an

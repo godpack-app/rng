@@ -10,7 +10,7 @@ COPY tsconfig.json tsconfig.check.json ./
 COPY src ./src
 COPY scripts ./scripts
 COPY test ./test
-RUN npm run check && npm test
+RUN npm run check && npm run test:coverage
 
 FROM tested AS built
 

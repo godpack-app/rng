@@ -11,7 +11,8 @@
     "start": "node dist/server.js",
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
     "check": "tsc -p tsconfig.check.json",
-    "test": "node --import tsx --test test/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts test/*.test.mjs",
+    "test:coverage": "c8 --all --include='src/**/*.ts' --check-coverage --branches=100 --reporter=text node --import tsx --test test/*.test.ts test/*.test.mjs",
     "verify": "node --import tsx scripts/verify-chain.ts"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.3",
+    "c8": "^12.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }

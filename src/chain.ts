@@ -199,13 +199,7 @@ export class RngChain {
       const entries: RngEntry[] = [];
       let previousHash = head.hash;
 
-      for (let index = 0; index < count; index++) {
-        const randomValue = values[index];
-
-        if (randomValue === undefined) {
-          throw new ChainError('CORRUPT_CHAIN', 'Missing random value');
-        }
-
+      for (const [index, randomValue] of values.entries()) {
         const unhashed: Omit<RngEntry, 'hash'> = {
           version: RNG_SCHEMA_VERSION,
           sequence: head.sequence + index + 1,
@@ -268,11 +262,8 @@ export class RngChain {
     }
 
     const entries = storedEntries.map(requireEntry);
-    const first = entries[0];
-
-    if (!first) {
-      throw new ChainError('CORRUPT_CHAIN', 'Empty idempotent batch');
-    }
+    // The validated receipt has count >= 1, and getMany returned that many entries.
+    const first = entries[0]!;
 
     const prior: RngHead = {
       version: RNG_SCHEMA_VERSION,
