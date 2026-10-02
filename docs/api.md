@@ -1,8 +1,9 @@
 # RNG service API v1
 
-All request and response bodies are JSON. The write endpoint requires a bearer
-API key; health and chain reads are public. A successful write returns only
-after its entries, request receipt, checkpoint, and chain head commit together.
+The API endpoints below exchange JSON. `GET /` serves a public HTML chain
+explorer. The write endpoint requires a bearer API key; health and chain reads
+are public. A successful write returns only after its entries, request receipt,
+checkpoint, and chain head commit together.
 
 The API returns an integer `random_u53` in `[0, 2^53)` for each requested draw.
 The corresponding `probability` is `random_u53 / 2^53`, so it is in `[0, 1)`.
@@ -82,6 +83,13 @@ Each public entry has the same `version`, `sequence`, `batch_id`, `batch_index`,
 `random_u53`, `previous_hash`, `hash`, `created_at`, and derived `probability`
 fields as an entry in a draw-batch response. See [protocol.md](protocol.md)
 for the exact hash calculation and verification procedure.
+
+## Chain explorer
+
+`GET /` shows the latest entry. To inspect another entry, supply its sequence
+number as `/?sequence=25`. The page shows up to 20 preceding and 20 subsequent
+entries. Add `&hash=<64-character-hex-hash>` to compare a receipt's hash with
+the selected entry. The hash is a check; sequence is the lookup key.
 
 ## Errors
 

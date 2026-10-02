@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import express, { type ErrorRequestHandler } from 'express';
 import { Check } from 'typebox/value';
 import { ChainError, probability, RngChain } from './chain.js';
+import { renderExplorer } from './explorer.js';
 import {
   RNG_MAX_PAGE_SIZE,
   RNG_SCHEMA_VERSION,
@@ -45,6 +46,92 @@ export function createApp(options: AppOptions) {
   const notifyCheckpoint = options.onCheckpoint ?? publishCheckpoint;
 
   app.use(express.json({ limit: '4kb' }));
+
+  app.get('/', async (request, response) => {
+    const head = await options.chain.head();
+    const rawSequence = request.query.sequence;
+    const rawHash = request.query.hash;
+    const sequenceInput = typeof rawSequence === 'string'
+      ? rawSequence
+      : rawSequence === undefined && head.sequence > 0
+        ? String(head.sequence)
+        : '';
+    const hashInput = typeof rawHash === 'string' ? rawHash : '';
+    const initialPage = {
+      head,
+      sequenceInput,
+      hashInput,
+      selected: null,
+      previous: [],
+      subsequent: [],
+    };
+
+    response.set('Cache-Control', 'no-store');
+
+    if (
+      rawHash !== undefined &&
+      (typeof rawHash !== 'string' || (rawHash !== '' && !/^[0-9a-fA-F]{64}$/.test(rawHash)))
+    ) {
+      response.status(400).type('html').send(renderExplorer({
+        ...initialPage,
+        error: 'Enter a 64-character hexadecimal hash, or leave the hash field empty.',
+      }));
+      return;
+    }
+
+    if (rawSequence === undefined && hashInput !== '') {
+      response.status(400).type('html').send(renderExplorer({
+        ...initialPage,
+        error: 'Enter a sequence number to check a hash.',
+      }));
+      return;
+    }
+
+    const sequence = rawSequence === undefined
+      ? head.sequence
+      : parseInteger(rawSequence, 1, Number.MAX_SAFE_INTEGER);
+
+    if (sequence === null) {
+      response.status(400).type('html').send(renderExplorer({
+        ...initialPage,
+        error: 'Enter a valid positive sequence number.',
+      }));
+      return;
+    }
+
+    if (sequence > head.sequence) {
+      response.status(404).type('html').send(renderExplorer({
+        ...initialPage,
+        error: `Entry #${sequence} has not been committed yet.`,
+      }));
+      return;
+    }
+
+    if (sequence === 0) {
+      response.type('html').send(renderExplorer(initialPage));
+      return;
+    }
+
+    const firstSequence = Math.max(1, sequence - 20);
+    const lastSequence = Math.min(head.sequence, sequence + 20);
+    const entries = await options.chain.entries(
+      firstSequence - 1,
+      lastSequence - firstSequence + 1,
+    );
+    const publicEntries = entries.map((entry) => ({
+      ...entry,
+      probability: probability(entry),
+    }));
+    // The chain returns every sequence in the requested committed range.
+    const selected = publicEntries[sequence - firstSequence]!;
+
+    response.type('html').send(renderExplorer({
+      ...initialPage,
+      selected,
+      previous: publicEntries.filter((entry) => entry.sequence < sequence),
+      subsequent: publicEntries.filter((entry) => entry.sequence > sequence),
+    }));
+  });
 
   app.get('/health', (_request, response) => {
     response.json({ status: 'ok' });

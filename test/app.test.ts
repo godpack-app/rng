@@ -322,3 +322,95 @@ test('checkpoint publishing errors do not change a committed draw response', asy
   assert.equal(logged.length, 1);
   assert.equal(logged[0]?.[0], 'Checkpoint publisher failed');
 });
+
+test('the explorer shows an empty chain and defaults to the latest draw', async () => {
+  const chain = new RngChain(new MemoryStore());
+  const app = createApp({ chain, apiKey: API_KEY });
+
+  await withApp(app, async (baseUrl) => {
+    const empty = await fetch(baseUrl);
+    assert.equal(empty.status, 200);
+    assert.match(empty.headers.get('content-type') ?? '', /text\/html/);
+    assert.equal(empty.headers.get('cache-control'), 'no-store');
+    assert.match(await empty.text(), /No draws have been published yet/);
+
+    await chain.append(3, 'explorer-latest');
+    const latest = await fetch(baseUrl);
+    const html = await latest.text();
+    assert.match(html, /Entry #3/);
+    assert.match(html, /Previous entries/);
+    assert.match(html, /Subsequent entries/);
+    assert.match(html, /No later entries are committed yet/);
+  });
+});
+
+test('the explorer retrieves exactly 20 entries before and after a sequence', async () => {
+  const chain = new RngChain(new MemoryStore());
+  await chain.append(50, 'explorer-window');
+  const target = await chain.entry(25);
+  assert.ok(target);
+
+  await withApp(createApp({ chain, apiKey: API_KEY }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/?sequence=25`);
+    const html = await response.text();
+    const linkedSequences = [...html.matchAll(/href="\/\?sequence=(\d+)"/g)]
+      .map((match) => Number(match[1]));
+
+    assert.equal(response.status, 200);
+    assert.match(html, /Entry #25/);
+    assert.match(html, new RegExp(target.hash));
+    assert.deepEqual(linkedSequences, [
+      ...Array.from({ length: 20 }, (_, index) => index + 5),
+      ...Array.from({ length: 20 }, (_, index) => index + 26),
+    ]);
+  });
+});
+
+test('the explorer checks an optional hash and reports a mismatch', async () => {
+  const chain = new RngChain(new MemoryStore());
+  await chain.append(1, 'explorer-hash');
+  const target = await chain.entry(1);
+  assert.ok(target);
+  const wrongHash = `${target.hash.startsWith('0') ? '1' : '0'}${target.hash.slice(1)}`;
+
+  await withApp(createApp({ chain, apiKey: API_KEY }), async (baseUrl) => {
+    const matching = await fetch(`${baseUrl}/?sequence=1&hash=${target.hash.toUpperCase()}`);
+    assert.match(await matching.text(), /Hash matches this entry/);
+
+    const mismatching = await fetch(`${baseUrl}/?sequence=1&hash=${wrongHash}`);
+    assert.equal(mismatching.status, 200);
+    assert.match(await mismatching.text(), /Hash does not match this entry/);
+  });
+});
+
+test('the explorer validates inputs and escapes reflected text', async () => {
+  const chain = new RngChain(new MemoryStore());
+  await chain.append(1, 'explorer-errors');
+
+  await withApp(createApp({ chain, apiKey: API_KEY }), async (baseUrl) => {
+    const invalidSequence = await fetch(`${baseUrl}/?sequence=0`);
+    assert.equal(invalidSequence.status, 400);
+    assert.match(await invalidSequence.text(), /valid positive sequence number/);
+
+    const future = await fetch(`${baseUrl}/?sequence=2`);
+    assert.equal(future.status, 404);
+    assert.match(await future.text(), /has not been committed yet/);
+
+    const invalidHash = await fetch(`${baseUrl}/?sequence=1&hash=bad`);
+    assert.equal(invalidHash.status, 400);
+    assert.match(await invalidHash.text(), /64-character hexadecimal hash/);
+
+    const hashOnly = await fetch(`${baseUrl}/?hash=${'0'.repeat(64)}`);
+    assert.equal(hashOnly.status, 400);
+    assert.match(await hashOnly.text(), /Enter a sequence number to check a hash/);
+
+    const injection = await fetch(`${baseUrl}/?sequence=${encodeURIComponent('"<script>&\'')}`);
+    const html = await injection.text();
+    assert.equal(injection.status, 400);
+    assert.doesNotMatch(html, /<script>/);
+    assert.match(html, /&quot;&lt;script&gt;&amp;&#39;/);
+
+    assert.equal((await fetch(`${baseUrl}/?sequence=1&sequence=2`)).status, 400);
+    assert.equal((await fetch(`${baseUrl}/?sequence=1&hash=x&hash=y`)).status, 400);
+  });
+});
