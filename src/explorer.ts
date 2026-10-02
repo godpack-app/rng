@@ -34,7 +34,7 @@ function renderContext(title: string, entries: readonly RngPublicEntry[], empty:
     <section class="context-group" aria-label="${escapeHtml(title)}">
       <div class="section-heading">
         <h3>${escapeHtml(title)}</h3>
-        <span>${entries.length} of 20</span>
+        <span>${entries.length} 筆</span>
       </div>
       ${entries.length > 0
         ? `<ol class="entry-list">${entries.map(renderEntryRow).join('')}</ol>`
@@ -48,44 +48,42 @@ function renderSelection(page: ExplorerPage): string {
   if (!entry) {
     return page.error
       ? ''
-      : '<p class="empty-state">No draws have been published yet.</p>';
+      : '<p class="empty-state">目前沒有紀錄。</p>';
   }
 
   const expectedHash = page.hashInput.trim().toLowerCase();
   const hashCheck = expectedHash
     ? entry.hash === expectedHash
-      ? '<p class="hash-check match" role="status">Hash matches this entry.</p>'
-      : '<p class="hash-check mismatch" role="alert">Hash does not match this entry.</p>'
+      ? '<p class="hash-check match" role="status">雜湊相符</p>'
+      : '<p class="hash-check mismatch" role="alert">雜湊不符</p>'
     : '';
 
   return `
     <div class="results-heading">
-      <h2>Entry #${entry.sequence}</h2>
-      <span>Showing up to 20 entries on each side</span>
+      <h2>紀錄 #${entry.sequence}</h2>
     </div>
-    <section class="selected-entry" aria-label="Selected chain entry">
-      <div class="selected-topline">
-        <span class="eyebrow">Selected draw</span>
-        <span>Batch position ${entry.batch_index + 1}</span>
-      </div>
-      <div class="selected-probability">${entry.probability.toPrecision(12)}</div>
-      <p class="probability-note">Probability · exact integer ${entry.random_u53} / 2<sup>53</sup></p>
+    <section class="selected-entry" aria-label="所選紀錄">
+      <div class="selected-probability">機率 ${entry.probability.toPrecision(12)}</div>
       ${hashCheck}
       <dl class="entry-details">
         <div>
-          <dt>Entry hash</dt>
+          <dt>紀錄雜湊</dt>
           <dd><code>${escapeHtml(entry.hash)}</code></dd>
         </div>
         <div>
-          <dt>Previous hash</dt>
+          <dt>前筆雜湊</dt>
           <dd><code>${escapeHtml(entry.previous_hash)}</code></dd>
         </div>
         <div>
-          <dt>Batch ID</dt>
-          <dd><code>${escapeHtml(entry.batch_id)}</code></dd>
+          <dt>原始亂數</dt>
+          <dd><code>${entry.random_u53} / 2<sup>53</sup></code></dd>
         </div>
         <div>
-          <dt>Created</dt>
+          <dt>批次</dt>
+          <dd><code>${escapeHtml(entry.batch_id)} · ${entry.batch_index + 1}</code></dd>
+        </div>
+        <div>
+          <dt>建立時間</dt>
           <dd>
             <time datetime="${escapeHtml(entry.created_at)}">${escapeHtml(entry.created_at)}</time>
           </dd>
@@ -93,8 +91,8 @@ function renderSelection(page: ExplorerPage): string {
       </dl>
     </section>
     <div class="context-grid">
-      ${renderContext('Previous entries', page.previous, 'This is the first entry in the chain.')}
-      ${renderContext('Subsequent entries', page.subsequent, 'No later entries are committed yet.')}
+      ${renderContext('前 20 筆', page.previous, '沒有更早的紀錄。')}
+      ${renderContext('後 20 筆', page.subsequent, '沒有更新的紀錄。')}
     </div>`;
 }
 
@@ -104,26 +102,36 @@ export function renderExplorer(page: ExplorerPage): string {
     : '';
 
   return `<!doctype html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RNG chain explorer</title>
+  <title>GodPack 亂數鏈</title>
   <style>
     :root {
-      color-scheme: light;
+      color-scheme: dark;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --godpack-bg: #050505;
+      --godpack-panel: #0a0a0a;
+      --godpack-panel2: #121212;
+      --godpack-line: #2a2210;
+      --godpack-text: #f5f2ea;
+      --godpack-muted: #8f8a7e;
+      --godpack-accent: #f7ba0b;
+      --godpack-accent-hi: #ffd24a;
+      --godpack-accent-dim: #c08b05;
+      --godpack-danger: #ed1010;
     }
     * {
       box-sizing: border-box;
     }
     body {
       margin: 0;
-      background: #f4f6fa;
-      color: #17233a;
+      background: var(--godpack-bg);
+      color: var(--godpack-text);
     }
     a {
-      color: #174e9b;
+      color: var(--godpack-accent);
     }
     .shell {
       max-width: 1100px;
@@ -136,50 +144,37 @@ export function renderExplorer(page: ExplorerPage): string {
       justify-content: space-between;
       gap: 16px;
       padding: 25px 0;
-      border-bottom: 1px solid #dbe2ed;
+      border-bottom: 1px solid var(--godpack-line);
     }
     .brand {
-      color: #17233a;
+      color: var(--godpack-accent);
       font-size: 18px;
       font-weight: 750;
       letter-spacing: -0.03em;
       text-decoration: none;
     }
     .head-pill {
-      border: 1px solid #cbd8ea;
+      border: 1px solid var(--godpack-line);
       border-radius: 999px;
-      background: #fff;
+      background: var(--godpack-panel2);
       padding: 8px 13px;
-      color: #40526e;
+      color: var(--godpack-muted);
       font-size: 13px;
     }
     main {
       padding-top: 46px;
     }
-    .eyebrow {
-      color: #3464a5;
-      font-size: 12px;
-      font-weight: 750;
-      letter-spacing: 0.11em;
-      text-transform: uppercase;
-    }
     h1 {
-      margin: 10px 0 12px;
-      font-size: clamp(32px, 5vw, 49px);
+      margin: 0 0 28px;
+      font-size: clamp(30px, 5vw, 44px);
       letter-spacing: -0.055em;
       line-height: 1.08;
     }
-    .intro {
-      max-width: 710px;
-      margin: 0 0 30px;
-      color: #53627a;
-      line-height: 1.65;
-    }
     .search-panel, .selected-entry, .context-group {
-      border: 1px solid #dbe2ed;
+      border: 1px solid var(--godpack-line);
       border-radius: 18px;
-      background: #fff;
-      box-shadow: 0 8px 30px rgba(19, 39, 74, 0.035);
+      background: var(--godpack-panel);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
     }
     .search-panel {
       padding: 24px;
@@ -193,50 +188,45 @@ export function renderExplorer(page: ExplorerPage): string {
     label {
       display: grid;
       gap: 8px;
-      color: #334762;
+      color: var(--godpack-text);
       font-size: 13px;
       font-weight: 650;
     }
     input {
       width: 100%;
       min-height: 43px;
-      border: 1px solid #bcc9db;
+      border: 1px solid var(--godpack-line);
       border-radius: 9px;
+      background: var(--godpack-panel2);
       padding: 9px 12px;
-      color: #17233a;
+      color: var(--godpack-text);
       font: inherit;
       font-size: 15px;
     }
     input:focus {
-      outline: 3px solid #d8e8ff;
-      border-color: #3672bf;
+      outline: 3px solid rgba(247, 186, 11, 0.18);
+      border-color: var(--godpack-accent);
     }
     button {
       min-height: 43px;
       border: 0;
       border-radius: 9px;
-      background: #245fa9;
+      background: var(--godpack-accent);
       padding: 0 19px;
-      color: #fff;
+      color: #000;
       font: inherit;
       font-weight: 700;
       cursor: pointer;
     }
     button:hover {
-      background: #164b8d;
-    }
-    .form-help {
-      margin: 12px 0 0;
-      color: #65738a;
-      font-size: 13px;
-      line-height: 1.5;
+      background: var(--godpack-accent-hi);
     }
     .form-error {
       margin: 16px 0 0;
       border-radius: 9px;
-      background: #fff0ee;
+      background: rgba(237, 16, 16, 0.12);
       padding: 12px 14px;
-      color: #aa352b;
+      color: var(--godpack-danger);
     }
     .latest-link {
       display: inline-block;
@@ -244,10 +234,6 @@ export function renderExplorer(page: ExplorerPage): string {
       font-size: 13px;
     }
     .results-heading {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 15px;
       margin: 42px 0 15px;
     }
     .results-heading h2 {
@@ -255,31 +241,16 @@ export function renderExplorer(page: ExplorerPage): string {
       font-size: 25px;
       letter-spacing: -0.035em;
     }
-    .results-heading span {
-      color: #65738a;
-      font-size: 13px;
-    }
     .selected-entry {
       padding: 25px;
-      border-color: #9bbbe5;
-    }
-    .selected-topline {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      color: #65738a;
-      font-size: 13px;
+      border-color: var(--godpack-accent-dim);
     }
     .selected-probability {
-      margin-top: 20px;
+      margin-bottom: 20px;
+      color: var(--godpack-accent);
       font-size: clamp(26px, 4vw, 40px);
       font-weight: 750;
       letter-spacing: -0.04em;
-    }
-    .probability-note {
-      margin: 5px 0 24px;
-      color: #65738a;
-      font-size: 13px;
     }
     .hash-check {
       display: inline-block;
@@ -290,31 +261,31 @@ export function renderExplorer(page: ExplorerPage): string {
       font-weight: 700;
     }
     .match {
-      background: #e7f7ed;
-      color: #226143;
+      background: rgba(247, 186, 11, 0.12);
+      color: var(--godpack-accent);
     }
     .mismatch {
-      background: #fff0ee;
-      color: #aa352b;
+      background: rgba(237, 16, 16, 0.12);
+      color: var(--godpack-danger);
     }
     .entry-details {
       display: grid;
       gap: 0;
       margin: 0;
-      border-top: 1px solid #e6ebf2;
+      border-top: 1px solid var(--godpack-line);
     }
     .entry-details div {
       display: grid;
       grid-template-columns: 135px minmax(0, 1fr);
       gap: 14px;
       padding: 13px 0;
-      border-bottom: 1px solid #e6ebf2;
+      border-bottom: 1px solid var(--godpack-line);
     }
     .entry-details div:last-child {
       border-bottom: 0;
     }
     dt {
-      color: #65738a;
+      color: var(--godpack-muted);
       font-size: 13px;
     }
     dd {
@@ -348,7 +319,7 @@ export function renderExplorer(page: ExplorerPage): string {
       font-size: 16px;
     }
     .section-heading span {
-      color: #7c8798;
+      color: var(--godpack-muted);
       font-size: 12px;
       white-space: nowrap;
     }
@@ -363,7 +334,7 @@ export function renderExplorer(page: ExplorerPage): string {
       gap: 7px 12px;
       align-items: center;
       padding: 12px 0;
-      border-top: 1px solid #edf0f5;
+      border-top: 1px solid var(--godpack-line);
       font-size: 12px;
     }
     .entry-link {
@@ -378,21 +349,15 @@ export function renderExplorer(page: ExplorerPage): string {
     }
     .entry-row time {
       grid-column: 2 / -1;
-      color: #8691a2;
+      color: var(--godpack-muted);
       font-size: 11px;
     }
     .empty-context, .empty-state {
-      color: #65738a;
+      color: var(--godpack-muted);
       line-height: 1.6;
     }
     .empty-state {
       margin-top: 32px;
-    }
-    footer {
-      margin-top: 42px;
-      color: #7c8798;
-      font-size: 12px;
-      line-height: 1.5;
     }
     @media (max-width: 760px) {
       .shell {
@@ -404,13 +369,6 @@ export function renderExplorer(page: ExplorerPage): string {
       form, .context-grid {
         grid-template-columns: 1fr;
       }
-      .results-heading {
-        display: block;
-      }
-      .results-heading span {
-        display: block;
-        margin-top: 7px;
-      }
       .entry-details div {
         grid-template-columns: 1fr;
         gap: 5px;
@@ -421,40 +379,30 @@ export function renderExplorer(page: ExplorerPage): string {
 <body>
   <div class="shell">
     <header>
-      <a class="brand" href="/">rng / chain explorer</a>
-      <span class="head-pill">Current head #${page.head.sequence}</span>
+      <a class="brand" href="/">GodPack</a>
+      <span class="head-pill">最新序號 #${page.head.sequence}</span>
     </header>
     <main>
-      <span class="eyebrow">Public chain record</span>
-      <h1>Inspect a draw and its neighbors.</h1>
-      <p class="intro">
-        Enter the sequence number from a draw receipt to see up to 20 entries before and after it.
-        Add its hash to check that the selected record matches what you received.
-      </p>
-      <section class="search-panel" aria-label="Find a chain entry">
+      <h1>亂數鏈查詢</h1>
+      <section class="search-panel" aria-label="查詢紀錄">
         <form method="get" action="/">
-          <label for="sequence">Sequence number
+          <label for="sequence">序號
             <input id="sequence" name="sequence" type="number" min="1"
               max="9007199254740991" step="1" inputmode="numeric"
               value="${escapeHtml(page.sequenceInput)}" required>
           </label>
-          <label for="hash">Entry hash <span>(optional check)</span>
+          <label for="hash">紀錄雜湊（選填）
             <input id="hash" name="hash" type="text" pattern="[0-9a-fA-F]{64}"
               maxlength="64" spellcheck="false" autocomplete="off"
-              value="${escapeHtml(page.hashInput)}" placeholder="64-character SHA-256 hash">
+              value="${escapeHtml(page.hashInput)}" placeholder="64 位十六進位雜湊">
           </label>
-          <button type="submit">Inspect entry</button>
+          <button type="submit">查詢</button>
         </form>
-        <p class="form-help">
-          The sequence locates the entry directly. The hash checks that entry;
-          a hash alone does not identify a position in this chain.
-        </p>
         ${error}
-        <a class="latest-link" href="/">View latest entry</a>
+        <a class="latest-link" href="/">查看最新紀錄</a>
       </section>
       ${renderSelection(page)}
     </main>
-    <footer>Chain records are public. Independent checkpoint anchoring is not configured yet.</footer>
   </div>
 </body>
 </html>`;

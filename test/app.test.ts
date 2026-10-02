@@ -332,15 +332,20 @@ test('the explorer shows an empty chain and defaults to the latest draw', async 
     assert.equal(empty.status, 200);
     assert.match(empty.headers.get('content-type') ?? '', /text\/html/);
     assert.equal(empty.headers.get('cache-control'), 'no-store');
-    assert.match(await empty.text(), /No draws have been published yet/);
+    const emptyHtml = await empty.text();
+    assert.match(emptyHtml, /<html lang="zh-Hant">/);
+    assert.match(emptyHtml, /GodPack 亂數鏈/);
+    assert.match(emptyHtml, /--godpack-accent: #f7ba0b/);
+    assert.match(emptyHtml, /目前沒有紀錄/);
+    assert.doesNotMatch(emptyHtml, /eyebrow|class="intro"|class="form-help"/);
 
     await chain.append(3, 'explorer-latest');
     const latest = await fetch(baseUrl);
     const html = await latest.text();
-    assert.match(html, /Entry #3/);
-    assert.match(html, /Previous entries/);
-    assert.match(html, /Subsequent entries/);
-    assert.match(html, /No later entries are committed yet/);
+    assert.match(html, /紀錄 #3/);
+    assert.match(html, /前 20 筆/);
+    assert.match(html, /後 20 筆/);
+    assert.match(html, /沒有更新的紀錄/);
   });
 });
 
@@ -357,7 +362,7 @@ test('the explorer retrieves exactly 20 entries before and after a sequence', as
       .map((match) => Number(match[1]));
 
     assert.equal(response.status, 200);
-    assert.match(html, /Entry #25/);
+    assert.match(html, /紀錄 #25/);
     assert.match(html, new RegExp(target.hash));
     assert.deepEqual(linkedSequences, [
       ...Array.from({ length: 20 }, (_, index) => index + 5),
@@ -375,11 +380,11 @@ test('the explorer checks an optional hash and reports a mismatch', async () => 
 
   await withApp(createApp({ chain, apiKey: API_KEY }), async (baseUrl) => {
     const matching = await fetch(`${baseUrl}/?sequence=1&hash=${target.hash.toUpperCase()}`);
-    assert.match(await matching.text(), /Hash matches this entry/);
+    assert.match(await matching.text(), /雜湊相符/);
 
     const mismatching = await fetch(`${baseUrl}/?sequence=1&hash=${wrongHash}`);
     assert.equal(mismatching.status, 200);
-    assert.match(await mismatching.text(), /Hash does not match this entry/);
+    assert.match(await mismatching.text(), /雜湊不符/);
   });
 });
 
@@ -390,19 +395,19 @@ test('the explorer validates inputs and escapes reflected text', async () => {
   await withApp(createApp({ chain, apiKey: API_KEY }), async (baseUrl) => {
     const invalidSequence = await fetch(`${baseUrl}/?sequence=0`);
     assert.equal(invalidSequence.status, 400);
-    assert.match(await invalidSequence.text(), /valid positive sequence number/);
+    assert.match(await invalidSequence.text(), /有效的正整數序號/);
 
     const future = await fetch(`${baseUrl}/?sequence=2`);
     assert.equal(future.status, 404);
-    assert.match(await future.text(), /has not been committed yet/);
+    assert.match(await future.text(), /尚未建立/);
 
     const invalidHash = await fetch(`${baseUrl}/?sequence=1&hash=bad`);
     assert.equal(invalidHash.status, 400);
-    assert.match(await invalidHash.text(), /64-character hexadecimal hash/);
+    assert.match(await invalidHash.text(), /64 位十六進位雜湊/);
 
     const hashOnly = await fetch(`${baseUrl}/?hash=${'0'.repeat(64)}`);
     assert.equal(hashOnly.status, 400);
-    assert.match(await hashOnly.text(), /Enter a sequence number to check a hash/);
+    assert.match(await hashOnly.text(), /請輸入序號以核對雜湊/);
 
     const injection = await fetch(`${baseUrl}/?sequence=${encodeURIComponent('"<script>&\'')}`);
     const html = await injection.text();

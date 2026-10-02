@@ -74,7 +74,7 @@ export function createApp(options: AppOptions) {
     ) {
       response.status(400).type('html').send(renderExplorer({
         ...initialPage,
-        error: 'Enter a 64-character hexadecimal hash, or leave the hash field empty.',
+        error: '請輸入 64 位十六進位雜湊，或留空。',
       }));
       return;
     }
@@ -82,7 +82,7 @@ export function createApp(options: AppOptions) {
     if (rawSequence === undefined && hashInput !== '') {
       response.status(400).type('html').send(renderExplorer({
         ...initialPage,
-        error: 'Enter a sequence number to check a hash.',
+        error: '請輸入序號以核對雜湊。',
       }));
       return;
     }
@@ -94,7 +94,7 @@ export function createApp(options: AppOptions) {
     if (sequence === null) {
       response.status(400).type('html').send(renderExplorer({
         ...initialPage,
-        error: 'Enter a valid positive sequence number.',
+        error: '請輸入有效的正整數序號。',
       }));
       return;
     }
@@ -102,7 +102,7 @@ export function createApp(options: AppOptions) {
     if (sequence > head.sequence) {
       response.status(404).type('html').send(renderExplorer({
         ...initialPage,
-        error: `Entry #${sequence} has not been committed yet.`,
+        error: `紀錄 #${sequence} 尚未建立。`,
       }));
       return;
     }
